@@ -8,22 +8,33 @@
 #ifndef ProfileHandler_h
 #define ProfileHandler_h
 
-#include <PubSubClient.h>
+#include <MQTTClient.h>
 #include <ArduinoJson.h>
+
+#define YAHA_TYPE_OFF 0
+#define YAHA_TYPE_SWITCH 1
 
 class ProfileHandler {
   private:
-    PubSubClient* client;
+    MQTTClient* client;
     unsigned short int type;
     unsigned short int inTopicsCount;
+    unsigned long lastDebounceCheck;
+    uint8_t lastValue;  
+    uint8_t lastDebounceValue;
     char** inTopics;
+    char* outTopic;
+    short int actuate;
+    short int listen;
+    boolean on;
     
   public:
-    ProfileHandler(PubSubClient* client, JsonObject& config);
+    ProfileHandler(MQTTClient* client, JsonObject& config);
     ~ProfileHandler();
     void init();
     void loop();
-    bool handle(char* topic, byte* payload, unsigned int length);
+    void switchChanged();
+    bool handle(char topic[], char payload[], int length);
 
 };
 

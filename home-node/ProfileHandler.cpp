@@ -1,6 +1,6 @@
 #include "ProfileHandler.h"
 
-ProfileHandler::ProfileHandler(PubSubClient* client, JsonObject& config) {
+ProfileHandler::ProfileHandler(MQTTClient* client, JsonObject& config) {
   this->client = client; 
   this->type = config.get<unsigned short>("type");
   
@@ -12,6 +12,10 @@ ProfileHandler::ProfileHandler(PubSubClient* client, JsonObject& config) {
   for(int i = 0 ; i < this->inTopicsCount ; i++ ) {
     this->inTopics[i] = strdup(inTopics[i].asString());
   }
+
+  this->outTopic = strdup( config["out_topic"].asString() );
+  this->actuate = config.get<short>("actuate");
+  this->listen = config.get<short>("listen");
 }
 
 ProfileHandler::~ProfileHandler() {
@@ -25,8 +29,26 @@ ProfileHandler::~ProfileHandler() {
 }
 
 void ProfileHandler::init() {
-  Serial.print("Init profile ");
+  Serial.print("Init profile type ");
   Serial.println(this->type);
+
+  if (this->type == YAHA_TYPE_SWITCH) {
+    if (this->actuate != -1) {
+      Serial.print("Actuate on ");
+      Serial.println(this->actuate);
+      pinMode( this->actuate, OUTPUT);
+    }
+
+    if (this->listen != -1) {
+      Serial.print("Listen on ");
+      Serial.println(this->listen);
+      pinMode( this->listen, INPUT_PULLUP);
+
+      //To prevent an initial "event" by the debounce logic
+      this->lastValue = digitalRead(this->listen);
+      this->lastDebounceValue = this->lastValue;
+    }
+  }
 
   for(int i = 0 ; i < this->inTopicsCount ; i++ ) {
     Serial.print("Subscribe to ");
@@ -36,21 +58,47 @@ void ProfileHandler::init() {
 }
 
 void ProfileHandler::loop() {
-  
+  if (this->on) {
+    digitalWrite(this->actuate, HIGH);
+  } else {
+    digitalWrite(this->actuate, LOW);
+  }
+
+  uint8_t value = digitalRead(this->listen);
+
+  // Maybe there is a glitch in the matrix, maybe there is an event
+  if (value != this->lastValue) {
+    if (value != this->lastDebounceValue) {
+      this->lastDebounceCheck = millis();
+    }
+
+    if ( (millis() - this->lastDebounceCheck) > 20 ) {
+      this->switchChanged();
+      this->lastValue = value;
+    }
+    this->lastDebounceValue = value;
+  }
 }
 
-bool ProfileHandler::handle(char* topic, byte* payload, unsigned int length) {
+
+void ProfileHandler::switchChanged() {
+  Serial.println("switchChanged");
+  this->on = ! this->on;
+  this->client->publish(this->outTopic, "switch");
+}
+
+bool ProfileHandler::handle(char topic[], char payload[], int length) {
   for(int i = 0 ; i < this->inTopicsCount ; i++ ) {
-    if (strcmp(this->inTopics[i], topic) == 0) {
-      // Switch on the LED if an 1 was received as first character
-      if ((char)payload[0] == '1') {
-        Serial.println("Swicthing on..");
-        digitalWrite(BUILTIN_LED, LOW);   // Turn the LED on (Note that LOW is the voltage level
-        // but actually the LED is on; this is because
-        // it is acive low on the ESP-01)
-      } else {
-        Serial.println("Swicthing off..");
-        digitalWrite(BUILTIN_LED, HIGH);  // Turn the LED off by making the voltage HIGH
+    if (strcmp(this->inTopics[i], topic) == 0) { //I'm listening this topic, so I need to get to work
+
+      if (this->type == YAHA_TYPE_SWITCH) {
+        if ( payload[0] == '1') {
+          this->on = true;
+          Serial.println("Swicthing on..");
+        } else {
+          this->on = false;
+          Serial.println("Swicthing off..");
+        }
       }
       return true;
     }
