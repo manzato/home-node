@@ -1,8 +1,8 @@
 
 /*
  * Author "Guillermo Manzato <manzato@gmail.com>"
- * 
- * Wrapper around PubSubClient to allow using callbacks on subscribes 
+ *
+ * Wrapper around PubSubClient to allow using callbacks on subscribes
 */
 
 #ifndef ProfileHandler_h
@@ -16,26 +16,30 @@
 
 class ProfileHandler {
   private:
-    MQTTClient* client;
-    unsigned short int type;
-    unsigned short int inTopicsCount;
-    unsigned long lastDebounceCheck;
-    uint8_t lastValue;  
-    uint8_t lastDebounceValue;
-    char** inTopics;
-    char* outTopic;
-    short int actuate;
-    short int listen;
-    boolean on;
     
+  protected:
+    char** inTopics;
+    unsigned short int inTopicsCount;
+    MQTTClient* client;
+    char* outTopic;
+
   public:
-    ProfileHandler(MQTTClient* client, JsonObject& config);
     ~ProfileHandler();
-    void init();
-    void loop();
-    void switchChanged();
+
+    void setMqttClient(MQTTClient* client);
+    
+    virtual void init();
+
+    virtual void loop() = 0;
+
     bool handle(char topic[], char payload[], int length);
 
+    virtual void setup(JsonObject& config);
+
+    /** Returns an instance of the handlers specified by <i>type</i> */
+    static ProfileHandler* createHandler(short int type);
+
+    virtual void doHandle(char topic[], char payload[], int length) = 0;
 };
 
 #endif
