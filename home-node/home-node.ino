@@ -6,6 +6,7 @@
 #include <ESP8266WiFi.h>
 #include <ArduinoJson.h>
 #include "ProfileHandler.h"
+#include "SwitchHandler.h"
 
 const char* ssid = "el-wifis";
 const char* password = "guinet123";
@@ -19,7 +20,6 @@ char* configTopic;
 WiFiClient wifiClient;
 MQTTClient client(512); //(wifiClient);
 
-
 //The clientId generation was taken from https://github.com/marvinroger/homie-esp8266
 void clientIdSetup() {
   uint8_t mac[6];
@@ -27,21 +27,19 @@ void clientIdSetup() {
   sprintf(clientId, "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
   configTopic = (char*) malloc(strlen(clientId) + strlen(CONFIG_TOPIC_PREFIX) + 1);
   sprintf(configTopic, "%s%s", CONFIG_TOPIC_PREFIX, clientId);
-}
+};
 
 void setup() {
   Serial.begin(115200);
   Serial.println();
-  pinMode(BUILTIN_LED, OUTPUT); 
 
   //Generates the clientId and the configTopic
   clientIdSetup();
-  
+
   //Connect to wifi
   WiFi.begin(ssid);//, password);
 
   client.begin(mqtt_server, 1883, wifiClient);
-  //client.setServer(mqtt_server, 1883);
   client.onMessageAdvanced(handleMqttMessages);
 
   Serial.print("Connecting");
@@ -53,7 +51,10 @@ void setup() {
 
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
-}
+
+  pinMode(RX, OUTPUT);
+  digitalWrite(RX, LOW);
+};
 
 void reconnect() {
   // Loop until we're reconnected
@@ -61,7 +62,7 @@ void reconnect() {
     Serial.print("Attempting MQTT connection...");
     if (client.connect(clientId)) {
       Serial.println("connected");
-      
+
       //Subscribe to the configuration topic
       Serial.print("Subscribing to config topic: >");
       Serial.print(configTopic);
@@ -80,25 +81,24 @@ void reconnect() {
       delay(5000);
     }
   }
-}
-
+};
 
 void loop() {
   // Checks for network and reconnects if it isn't present
   if (! client.connected()) {
-    reconnect(); 
+    reconnect();
   }
-  
-    // Gives the mqtt client cycles to process
+
+  delay(10); //Apparently this helps with wifi stability...
+
+  // Gives the mqtt client cycles to process
   client.loop();
 
-  //delay(10); //Apparently this helps with wifi stability..
-  
   // Gives the handlers cycles to process their on-going tasks
   for(int i = 0 ; i < handlersCount  ; i++) {
     handlers[i]->loop();
   }
-}
+};
 
 void handleMqttConfigMessages(char topic[], char payload[], int length) {
   Serial.print("New configuration received!: ");
@@ -124,17 +124,18 @@ void handleMqttConfigMessages(char topic[], char payload[], int length) {
     Serial.println(i);
     JsonObject& config = profiles[i];
 
-    handlers[i] = new ProfileHandler(
-      &client, 
-      config      
-    );
+    handlers[i] = ProfileHandler::createHandler( config.get<unsigned short>("type"));
+    handlers[i]->setMqttClient(&client);
+    handlers[i]->setup(config);
   }
 
   //initialize handlers
   for(int i = 0 ; i < handlersCount  ; i++) {
+    Serial.print("Initializing profile handler #");
+    Serial.println(i);
     handlers[i]->init();
   }
-}
+};
 
 void handleMqttMessages(MQTTClient* client, char topic[], char payload[], int length) {
   //Let the handlers process the request if it is for them
@@ -142,6 +143,7 @@ void handleMqttMessages(MQTTClient* client, char topic[], char payload[], int le
   for(int i = 0 ; i < handlersCount  ; i++) {
     //Handler returns true if the request was for him
     if (handlers[i]->handle(topic, payload, length)) {
+      // Don't stop here, since another handler may be listening to the same topic
       handled = true;
     }
   }
@@ -150,43 +152,8 @@ void handleMqttMessages(MQTTClient* client, char topic[], char payload[], int le
     return;
   }
 
-  if ( strcmp(configTopic, topic) == 0) { 
-    return handleMqttConfigMessages(topic, payload, length);   
-  }
-
-  
-  Serial.print("Unhandled message on '");
-  Serial.print(topic);
-  Serial.print("' >");
-  //If nothing handled this so far, lets print it to the Serial and call it done
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
-  }
-  Serial.println("<");
-
-  // Switch on the LED if an 1 was received as first character
-  if ((char)payload[0] == '1') {
-    digitalWrite(BUILTIN_LED, LOW);   // Turn the LED on (Note that LOW is the voltage level
-    // but actually the LED is on; this is because
-    // it is acive low on the ESP-01)
-  } else {
-    digitalWrite(BUILTIN_LED, HIGH);  // Turn the LED off by making the voltage HIGH
-  }
-}
-
-/*
-// Handles all MQTT messages (including config messages)
-void EXhandleMqttMessages(char* topic, byte* payload, unsigned int length) {
-  //Let the handlers process the request if it is for them
-  for(int i = 0 ; i < handlersCount  ; i++) {
-    //Handler returns true if the request was for him
-    if (handlers[i]->handle(topic, payload, length)) {
-      return;
-    }
-  }
-
-  if ( strcmp(configTopic, topic) == 0) { 
-    return handleMqttConfigMessages(topic, payload, length);   
+  if ( strcmp(configTopic, topic) == 0) {
+    return handleMqttConfigMessages(topic, payload, length);
   }
 
   Serial.print("Unhandled message on '");
@@ -197,13 +164,5 @@ void EXhandleMqttMessages(char* topic, byte* payload, unsigned int length) {
     Serial.print((char)payload[i]);
   }
   Serial.println("<");
+};
 
-  // Switch on the LED if an 1 was received as first character
-  if ((char)payload[0] == '1') {
-    digitalWrite(BUILTIN_LED, LOW);   // Turn the LED on (Note that LOW is the voltage level
-    // but actually the LED is on; this is because
-    // it is acive low on the ESP-01)
-  } else {
-    digitalWrite(BUILTIN_LED, HIGH);  // Turn the LED off by making the voltage HIGH
-  }
-}*/
