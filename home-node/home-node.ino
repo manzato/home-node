@@ -1,3 +1,4 @@
+
 #define MAX_HANDLERS 8
 #define CONFIG_TOPIC_PREFIX "config/"
 
@@ -18,7 +19,7 @@ char clientId[13];
 char* configTopic;
 
 WiFiClient wifiClient;
-MQTTClient client(512); //(wifiClient);
+MQTTClient client(512); //max package size
 
 //The clientId generation was taken from https://github.com/marvinroger/homie-esp8266
 void clientIdSetup() {
@@ -51,9 +52,6 @@ void setup() {
 
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
-
-  pinMode(RX, OUTPUT);
-  digitalWrite(RX, LOW);
 };
 
 void reconnect() {
