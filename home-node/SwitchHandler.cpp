@@ -61,7 +61,7 @@ void SwitchHandler::init() {
   if (this->listen != -1) {
     Serial.print("Listen on ");
     Serial.println(this->listen);
-    pinMode( this->listen, INPUT_PULLUP);
+    pinMode( this->listen, INPUT);
 
     //To prevent an initial "event" by the debounce logic
     this->lastValue = digitalRead(this->listen);
