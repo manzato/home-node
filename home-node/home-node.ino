@@ -1,3 +1,4 @@
+
 #define MAX_HANDLERS 8
 #define CONFIG_TOPIC_PREFIX "config/"
 
@@ -7,10 +8,7 @@
 #include <ArduinoJson.h>
 #include "ProfileHandler.h"
 #include "SwitchHandler.h"
-
-const char* ssid = "el-wifis";
-const char* password = "guinet123";
-const char* mqtt_server = "192.168.8.121";
+#include "Customize.h" //Defines MQTT_IP, WIFI_SSID and WIFI_PASSWORD
 
 unsigned int handlersCount = 0;
 ProfileHandler* handlers[MAX_HANDLERS];
@@ -18,7 +16,7 @@ char clientId[13];
 char* configTopic;
 
 WiFiClient wifiClient;
-MQTTClient client(512); //(wifiClient);
+MQTTClient client(512); //max package size
 
 //The clientId generation was taken from https://github.com/marvinroger/homie-esp8266
 void clientIdSetup() {
@@ -37,9 +35,9 @@ void setup() {
   clientIdSetup();
 
   //Connect to wifi
-  WiFi.begin(ssid);//, password);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  client.begin(mqtt_server, 1883, wifiClient);
+  client.begin(MQTT_SERVER, MQTT_PORT, wifiClient);
   client.onMessageAdvanced(handleMqttMessages);
 
   Serial.print("Connecting");
@@ -51,9 +49,6 @@ void setup() {
 
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
-
-  pinMode(RX, OUTPUT);
-  digitalWrite(RX, LOW);
 };
 
 void reconnect() {
