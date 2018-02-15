@@ -20,15 +20,15 @@ class SwitchHandler: public ProfileHandler {
     unsigned long lastDebounceCheck;
     uint8_t lastValue;
     uint8_t lastDebounceValue;
+    void setOn();
+    void setOff();
+    void toggle();
 
   public:
     void setup(JsonObject& config);
     void init();
     void loop();
     void doHandle(char topic[], char payload[], int length);
-    void setOn();
-    void setOff();
-    void toggle();
 };
 
 #endif
