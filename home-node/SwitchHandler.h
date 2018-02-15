@@ -1,5 +1,5 @@
 /*
- * Wrapper around PubSubClient to allow using callbacks on subscribes
+ * A SwitchHandler is the virtual equivalent of a "light switch"
  *
  * Author "Guillermo Manzato <manzato@gmail.com>"
 */
