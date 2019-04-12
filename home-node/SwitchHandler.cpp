@@ -7,16 +7,20 @@ void SwitchHandler::setOn() {
   Serial.print("Switching ");
   Serial.print(this->actuate);
   Serial.println(" on");
-  this->client->publish(this->outTopic, "on");
-};
+  if (strlen(this->outTopic) > 0) {
+    this->client->publish(this->outTopic, "on");
+  }
+}
 
 void SwitchHandler::setOff() {
   this->on = false;
   Serial.print("Switching ");
   Serial.print(this->actuate);
   Serial.println(" off");
-  this->client->publish(this->outTopic, "off");
-};
+  if (strlen(this->outTopic) > 0) {
+    this->client->publish(this->outTopic, "off");
+  }
+}
 
 void SwitchHandler::toggle() {
   if ( this->on ) {
@@ -24,15 +28,15 @@ void SwitchHandler::toggle() {
   } else {
     this->setOn();
   }
-};
-    
+}
+
 void SwitchHandler::doHandle(char topic[], char payload[], int length) {
   if ( payload[0] == '1') {
     this->setOn();
   } else {
     this->setOff();
-  }  
-};
+  }
+}
 
 void SwitchHandler::setup(JsonObject& config) {
   super::setup(config);
@@ -41,17 +45,20 @@ void SwitchHandler::setup(JsonObject& config) {
   this->listen = config.get<short>("listen");
   this->on = config.get<boolean>("on");
 
-  Serial.print("Setting up a switch listening on pin ");
-  Serial.print(this->listen);
+  Serial.print("Setting up a switch");
+  if (this->listen != -1) {
+    Serial.print("listening on pin ");
+    Serial.print(this->listen);
+  }
   Serial.print(" which actuates pin ");
   Serial.print(this->actuate);
   Serial.print(" and initial state ");
   Serial.println(this->on ? "ON" : "OFF");
-};
+}
 
 void SwitchHandler::init() {
   super::init();
-  
+
   if (this->actuate != -1) {
     Serial.print("Actuate on ");
     Serial.println(this->actuate);
@@ -92,4 +99,4 @@ void SwitchHandler::loop() {
     }
     this->lastDebounceValue = value;
   }
-};
+}
