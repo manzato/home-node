@@ -2,7 +2,7 @@
 #define MAX_HANDLERS 8
 #define CONFIG_TOPIC_PREFIX "config/"
 
-#include <system.h>
+
 #include <MQTTClient.h>
 #include <ESP8266WiFi.h>
 #include <ArduinoJson.h>
