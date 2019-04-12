@@ -43,6 +43,8 @@ ProfileHandler*  ProfileHandler::createHandler(short int type) {
     case YAHA_TYPE_SWITCH:
       return new SwitchHandler();
   }
+  Serial.print("Unknown handler type: ");
+  Serial.println(type);
   return NULL;
 };
 
