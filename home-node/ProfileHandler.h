@@ -13,6 +13,8 @@
 
 #define YAHA_TYPE_OFF 0
 #define YAHA_TYPE_SWITCH 1
+#define YAHA_TYPE_DHT11_SENSOR 2
+
 
 class ProfileHandler {
   private:

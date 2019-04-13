@@ -1,6 +1,7 @@
 #include "ProfileHandler.h"
 
 #include "SwitchHandler.h"
+#include "DHT11Handler.h"
   
 ProfileHandler::~ProfileHandler() {
   Serial.println("Freeing resources");
@@ -42,6 +43,8 @@ ProfileHandler*  ProfileHandler::createHandler(short int type) {
   switch(type) {
     case YAHA_TYPE_SWITCH:
       return new SwitchHandler();
+    case YAHA_TYPE_DHT11_SENSOR:
+      return new DHT11Handler();
   }
   Serial.print("Unknown handler type: ");
   Serial.println(type);
@@ -57,4 +60,3 @@ bool ProfileHandler::handle(char topic[], char payload[], int length) {
   }
   return false;
 };
-

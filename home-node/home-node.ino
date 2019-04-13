@@ -7,7 +7,8 @@
 #include <ESP8266WiFi.h>
 #include <ArduinoJson.h>
 #include "ProfileHandler.h"
-#include "SwitchHandler.h"
+
+#include "DHT11Handler.h"
 #include "Customize.h" //Defines MQTT_IP, WIFI_SSID and WIFI_PASSWORD
 
 unsigned int handlersCount = 0;
@@ -160,4 +161,3 @@ void handleMqttMessages(MQTTClient* client, char topic[], char payload[], int le
   }
   Serial.println("<");
 };
-
