@@ -15,6 +15,7 @@ unsigned int handlersCount = 0;
 ProfileHandler* handlers[MAX_HANDLERS];
 char clientId[13];
 char* configTopic;
+unsigned long lastBroadcast = 0;
 
 WiFiClient wifiClient;
 MQTTClient client(512); //max package size
@@ -66,9 +67,8 @@ void reconnect() {
       client.subscribe(configTopic);
 
       delay(100);
-      //Announce ourselves, hopefully someone will reply and will start doing fun stuff
-      Serial.print("Broadcasting..");
-      client.publish("broadcast", clientId);
+
+      checkForConfig(true);
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.connected());
@@ -78,6 +78,27 @@ void reconnect() {
     }
   }
 };
+
+void checkForConfig(bool force) {
+
+  if ( ! force && handlersCount != 0 ) {
+    return;
+  }
+  
+  const unsigned long now = millis();
+
+  //Prevent locking if millis() overflows
+  if (now < lastBroadcast ) {
+    lastBroadcast = now;
+  }
+
+  if ( force || lastBroadcast == 0 || (now - lastBroadcast > 10000) ) {
+    //Announce ourselves, hopefully someone will reply and will start doing fun stuff
+    lastBroadcast = millis();
+    Serial.print("Broadcasting..");
+    client.publish("broadcast", clientId);
+  }
+}
 
 void loop() {
   // Checks for network and reconnects if it isn't present
@@ -90,6 +111,8 @@ void loop() {
   // Gives the mqtt client cycles to process
   client.loop();
 
+  checkForConfig(false);
+  
   // Gives the handlers cycles to process their on-going tasks
   for(int i = 0 ; i < handlersCount  ; i++) {
     handlers[i]->loop();
