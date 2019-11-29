@@ -2,9 +2,10 @@
 
 #include "SwitchHandler.h"
 #include "DHT11Handler.h"
-  
+#include "DS18B20Handler.h"
+
 ProfileHandler::~ProfileHandler() {
-  Serial.println("Freeing resources");
+  Serial.println(F("Freeing resources"));
 
   for(int i = 0 ; i < this->inTopicsCount ; i++ ) {
     this->client->unsubscribe(this->inTopics[i]);
@@ -17,22 +18,25 @@ void ProfileHandler::setMqttClient(MQTTClient* client) {
   this->client = client;
 };
 
-void ProfileHandler::setup(JsonObject& config) {
-  JsonArray& inTopics = config["in_topics"];
+void ProfileHandler::setup(JsonObject config) {
+  JsonArray inTopics = config.getMember("in_topics").as<JsonArray>();
 
   this->inTopicsCount = inTopics.size();
+  Serial.print(F("have "));
+  Serial.println( this->inTopicsCount);
+
   this->inTopics = (char**) malloc (this->inTopicsCount * sizeof( char* ));
 
   for(int i = 0 ; i < this->inTopicsCount ; i++) {
-    this->inTopics[i] = strdup(inTopics[i].asString());
+    this->inTopics[i] = strdup(inTopics[i].as<const char*>());
   }
 
-  this->outTopic = strdup( config["out_topic"].asString());
+  this->outTopic = strdup( config[F("out_topic")].as<const char*>());
 };
 
 void ProfileHandler::init() { 
   for(int i = 0 ; i < this->inTopicsCount ; i++ ) {
-    Serial.print("Subscribe to ");
+    Serial.print(F("Subscribe to "));
     Serial.println(this->inTopics[i]);
     this->client->subscribe(this->inTopics[i]);
   }
@@ -45,8 +49,10 @@ ProfileHandler*  ProfileHandler::createHandler(short int type) {
       return new SwitchHandler();
     case YAHA_TYPE_DHT11_SENSOR:
       return new DHT11Handler();
+    case YAHA_TYPE_DS18B20_SENSOR:
+      return new DS18B20Handler();
   }
-  Serial.print("Unknown handler type: ");
+  Serial.print(F("Unknown handler type: "));
   Serial.println(type);
   return NULL;
 };

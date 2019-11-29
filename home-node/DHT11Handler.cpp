@@ -6,13 +6,13 @@ void DHT11Handler::doHandle(char topic[], char payload[], int length) {
 
 }
 
-void DHT11Handler::setup(JsonObject& config) {
+void DHT11Handler::setup(JsonObject config) {
   super::setup(config);
-  this->listen = config.get<short>("listen");
+  this->listen = config.getMember("listen").as<short>();
 
-  Serial.print("Setting up a DHT11");
+  Serial.print(F("DHT11"));
   if (this->listen != -1) {
-    Serial.print("listening on pin ");
+    Serial.print(F("listening on pin "));
     Serial.print(this->listen);
   }
 }
@@ -23,7 +23,7 @@ void DHT11Handler::init() {
   if (this->listen == -1) {
     return;
   }
-  Serial.print("Listen on ");
+  Serial.print(F("Listen on "));
   Serial.println(this->listen);
   //pinMode( this->listen, INPUT);
   this->dht = new DHT_Unified(this->listen, DHT11);

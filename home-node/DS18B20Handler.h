@@ -1,26 +1,26 @@
 /*
- * A DHT11Handler is the interface to a DHT11 temp and humidity sensor
+ * A DS18B20Handler is the interface to a DS18B20 temp sensor
  *
  * Author "Guillermo Manzato <manzato@gmail.com>"
 */
 
-#ifndef DHT11Handler_h
-#define DHT11Handler_h
+#ifndef DS18B20Handler_h
+#define DS18B20Handler_h
 
-#include <ArduinoJson.h>
-#include <Adafruit_Sensor.h>
-#include <DHT.h>
-#include <DHT_U.h>
+#include <DallasTemperature.h>
+#include <OneWire.h>
 
 #include "ProfileHandler.h"
 
-class DHT11Handler: public ProfileHandler {
+class DS18B20Handler: public ProfileHandler {
   private:
     typedef ProfileHandler super;
     short int listen;
     unsigned long lastMeassurementMs;
     unsigned long minDelay;
-    DHT_Unified* dht;
+    OneWire* oneWire;
+    DallasTemperature* sensor;
+    boolean searchSensor();
     
   public:
     void setup(JsonObject config);

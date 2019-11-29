@@ -14,6 +14,7 @@
 #define YAHA_TYPE_OFF 0
 #define YAHA_TYPE_SWITCH 1
 #define YAHA_TYPE_DHT11_SENSOR 2
+#define YAHA_TYPE_DS18B20_SENSOR 3
 
 
 class ProfileHandler {
@@ -36,7 +37,7 @@ class ProfileHandler {
 
     bool handle(char topic[], char payload[], int length);
 
-    virtual void setup(JsonObject& config);
+    virtual void setup(JsonObject config);
 
     /** Returns an instance of the handlers specified by <i>type</i> */
     static ProfileHandler* createHandler(short int type);

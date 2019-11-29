@@ -1,11 +1,18 @@
 
-#define MAX_HANDLERS 8
+#define MAX_HANDLERS 10
 #define CONFIG_TOPIC_PREFIX "config/"
 
 
 #include <MQTTClient.h>
+
+#if defined(ESP8266)
 #include <ESP8266WiFi.h>
+#include <ESP8266mDNS.h>
+#endif
+
 #include <ArduinoJson.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
 #include "ProfileHandler.h"
 
 #include "DHT11Handler.h"
@@ -13,20 +20,17 @@
 
 unsigned int handlersCount = 0;
 ProfileHandler* handlers[MAX_HANDLERS];
-char clientId[13];
+char deviceId[10];
 char* configTopic;
 unsigned long lastBroadcast = 0;
 
 WiFiClient wifiClient;
 MQTTClient client(512); //max package size
 
-//The clientId generation was taken from https://github.com/marvinroger/homie-esp8266
 void clientIdSetup() {
-  uint8_t mac[6];
-  WiFi.macAddress(mac);
-  sprintf(clientId, "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-  configTopic = (char*) malloc(strlen(clientId) + strlen(CONFIG_TOPIC_PREFIX) + 1);
-  sprintf(configTopic, "%s%s", CONFIG_TOPIC_PREFIX, clientId);
+  sprintf(deviceId, "yaha-%04d", DEVICE_ID);
+  configTopic = (char*) malloc(strlen(deviceId) + strlen(CONFIG_TOPIC_PREFIX) + 1);
+  sprintf(configTopic, "%s%s", CONFIG_TOPIC_PREFIX, deviceId);
 };
 
 void setup() {
@@ -36,51 +40,91 @@ void setup() {
   //Generates the clientId and the configTopic
   clientIdSetup();
 
+  //Set wifi to client mode only
+  WiFi.mode(WIFI_STA);
+  ArduinoOTA.setHostname(deviceId);
+
   //Connect to wifi
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   client.begin(MQTT_SERVER, MQTT_PORT, wifiClient);
   client.onMessageAdvanced(handleMqttMessages);
 
-  Serial.print("Connecting");
+  Serial.print(F("Connecting"));
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    Serial.print(".");
+    Serial.print(F("."));
   }
   Serial.println();
 
-  Serial.print("Connected, IP address: ");
+  Serial.print(F("Connected, IP address: "));
   Serial.println(WiFi.localIP());
+
+  ArduinoOTA.onStart([]() {
+    String type;
+    if (ArduinoOTA.getCommand() == U_FLASH) {
+      type = F("sketch");
+    } else { // U_SPIFFS
+      type = F("filesystem");
+    }
+
+    // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+    Serial.println("Start updating " + type);
+  });
+
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nEnd");
+  });
+
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  });
+
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) {
+      Serial.println(F("Auth Failed"));
+    } else if (error == OTA_BEGIN_ERROR) {
+      Serial.println(F("Begin Failed"));
+    } else if (error == OTA_CONNECT_ERROR) {
+      Serial.println(F("Connect Failed"));
+    } else if (error == OTA_RECEIVE_ERROR) {
+      Serial.println(F("Receive Failed"));
+    } else if (error == OTA_END_ERROR) {
+      Serial.println(F("End Failed"));
+    }
+  });
+
+  ArduinoOTA.begin();
 };
 
 void reconnect() {
   // Loop until we're reconnected
   while (!client.connected()) {
-    Serial.print("Attempting MQTT connection...");
-    if (client.connect(clientId)) {
-      Serial.println("connected");
+    Serial.print(F("Attempting MQTT connection..."));
+    if (client.connect(deviceId, MQTT_USERNAME, MQTT_PASSWORD)) {
+      Serial.println(F("connected"));
 
       //Subscribe to the configuration topic
-      Serial.print("Subscribing to config topic: >");
+      Serial.print(F("Subscribing to config topic: >"));
       Serial.print(configTopic);
-      Serial.println("<");
+      Serial.println(F("<"));
       client.subscribe(configTopic);
 
       delay(100);
 
       checkForConfig(true);
     } else {
-      Serial.print("failed, rc=");
+      Serial.print(F("failed, rc="));
       Serial.print(client.connected());
-      Serial.println(" try again in 5 seconds");
-      // Wait 5 seconds before retrying
-      delay(5000);
+      Serial.println(F(" try again in 20 seconds"));
+      // Wait 20 seconds before retrying
+      delay(20 * 1000);
     }
   }
 };
 
 void checkForConfig(bool force) {
-
   if ( ! force && handlersCount != 0 ) {
     return;
   }
@@ -92,11 +136,16 @@ void checkForConfig(bool force) {
     lastBroadcast = now;
   }
 
-  if ( force || lastBroadcast == 0 || (now - lastBroadcast > 10000) ) {
+  if ( force || lastBroadcast == 0 || (now - lastBroadcast > 15 * 1000) ) {
     //Announce ourselves, hopefully someone will reply and will start doing fun stuff
-    lastBroadcast = millis();
-    Serial.print("Broadcasting..");
-    client.publish("broadcast", clientId);
+    lastBroadcast = now;
+    if (force) {
+      Serial.println(F("Forced broadcasting.."));
+    } else {
+      Serial.println(F("Broadcasting.."));
+    }
+
+    client.publish(F("broadcast"), deviceId);
   }
 }
 
@@ -107,6 +156,9 @@ void loop() {
   }
 
   delay(10); //Apparently this helps with wifi stability...
+
+  //Check for OTA updates
+  ArduinoOTA.handle();
 
   // Gives the mqtt client cycles to process
   client.loop();
@@ -120,18 +172,22 @@ void loop() {
 };
 
 void handleMqttConfigMessages(char topic[], char payload[], int length) {
-  Serial.print("New configuration received!: ");
+  Serial.print(F("New configuration received!: "));
   Serial.println( payload);
-  DynamicJsonBuffer jsonBuffer;
-  JsonArray& profiles = jsonBuffer.parseArray((char*)payload);
-  if (! profiles.success() ) {
-    Serial.print("Failed to parse JSON: >");
-    Serial.print(payload);
-    Serial.println("<");
-    return;
+  StaticJsonDocument<2048> doc;
+  DeserializationError error = deserializeJson(doc, payload);
+  if (DeserializationError::Ok != error) {
+      Serial.print(F("deserializeJson() failed with code "));
+      Serial.println(error.c_str());
+      Serial.print(F("Failed to parse JSON: >"));
+      Serial.print(payload);
+      Serial.println(F("<"));
+      return;
   }
 
-  // Cleanup / remove any existing handlers, which includes disconnecting from MQTT
+  JsonArray profiles = doc.as<JsonArray>();
+
+  // Cleanup / remove any existing handlers, which  includes disconnecting from MQTT
   for(int i = 0 ; i < handlersCount  ; i++) {
     delete handlers[i];
   }
@@ -139,18 +195,21 @@ void handleMqttConfigMessages(char topic[], char payload[], int length) {
 
   //Instantiate the required handlers
   for(int i = 0 ; i < handlersCount ; i++ ) {
-    Serial.print("Setting up profile handler #");
-    Serial.println(i);
-    JsonObject& config = profiles[i];
+    Serial.print(F("Setting up profile handler #"));
+    Serial.print(i);
+    Serial.print(F(": "));
+    JsonObject config = profiles[i];
 
-    handlers[i] = ProfileHandler::createHandler( config.get<unsigned short>("type"));
+    //Serial.println(config["type"].as<short int>());
+    handlers[i] = ProfileHandler::createHandler( config.getMember(F("type")));
     handlers[i]->setMqttClient(&client);
     handlers[i]->setup(config);
+    Serial.println();
   }
 
   //initialize handlers
   for(int i = 0 ; i < handlersCount  ; i++) {
-    Serial.print("Initializing profile handler #");
+    Serial.print(F("Initializing profile handler #"));
     Serial.println(i);
     handlers[i]->init();
   }
@@ -175,7 +234,7 @@ void handleMqttMessages(MQTTClient* client, char topic[], char payload[], int le
     return handleMqttConfigMessages(topic, payload, length);
   }
 
-  Serial.print("Unhandled message on '");
+  Serial.print(F("Unhandled message on '"));
   Serial.print(topic);
   Serial.print("' >");
   //If nothing handled this so far, lets print it to the Serial and call it done

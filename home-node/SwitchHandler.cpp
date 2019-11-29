@@ -7,6 +7,7 @@ void SwitchHandler::setOn() {
   Serial.print("Switching ");
   Serial.print(this->actuate);
   Serial.println(" on");
+  digitalWrite(this->actuate, this->invert ? LOW : HIGH);
   if (strlen(this->outTopic) > 0) {
     this->client->publish(this->outTopic, "on");
   }
@@ -17,6 +18,7 @@ void SwitchHandler::setOff() {
   Serial.print("Switching ");
   Serial.print(this->actuate);
   Serial.println(" off");
+  digitalWrite(this->actuate, this->invert ? HIGH : LOW);
   if (strlen(this->outTopic) > 0) {
     this->client->publish(this->outTopic, "off");
   }
@@ -38,35 +40,49 @@ void SwitchHandler::doHandle(char topic[], char payload[], int length) {
   }
 }
 
-void SwitchHandler::setup(JsonObject& config) {
+void SwitchHandler::setup(JsonObject config) {
   super::setup(config);
 
-  this->actuate = config.get<short>("actuate");
-  this->listen = config.get<short>("listen");
-  this->on = config.get<boolean>("on");
+  this->actuate = config.getMember(F("actuate")).as<short>();
+  this->listen = config.getMember(F("listen")).as<short>();
+  this->on= config.getMember(F("on")).as<bool>();
+  this->invert = config.getMember(F("invert")).as<bool>();
 
-  Serial.print("Setting up a switch");
+  Serial.print(F("Switch"));
   if (this->listen != -1) {
-    Serial.print("listening on pin ");
+    Serial.print(F(" listening on pin "));
     Serial.print(this->listen);
   }
-  Serial.print(" which actuates pin ");
-  Serial.print(this->actuate);
-  Serial.print(" and initial state ");
-  Serial.println(this->on ? "ON" : "OFF");
+  if (this->actuate != -1) {
+    Serial.print(F(" which actuates on pin "));
+    Serial.print(this->actuate);
+  }
+  Serial.print(F(" and initial state "));
+  Serial.print(this->on ? F("ON") : F("OFF"));
+
+  if (this->invert) {
+    Serial.print(F(" (inverted)"));
+  }
+  Serial.println();
 }
 
 void SwitchHandler::init() {
   super::init();
 
   if (this->actuate != -1) {
-    Serial.print("Actuate on ");
+    Serial.print(F("Actuate on "));
     Serial.println(this->actuate);
+    //Set initial state
+    if (this->on) {
+      this->setOn();
+    } else {
+      this->setOff();
+    }
     pinMode( this->actuate, OUTPUT);
   }
 
   if (this->listen != -1) {
-    Serial.print("Listen on ");
+    Serial.print(F("Listen on "));
     Serial.println(this->listen);
     pinMode( this->listen, INPUT);
 
@@ -77,13 +93,6 @@ void SwitchHandler::init() {
 }
 
 void SwitchHandler::loop() {
-  //Update the output PIN with the current state
-  if (this->on) {
-    digitalWrite(this->actuate, HIGH);
-  } else {
-    digitalWrite(this->actuate, LOW);
-  }
-
   // Check for a switch change
   uint8_t value = digitalRead(this->listen);
 

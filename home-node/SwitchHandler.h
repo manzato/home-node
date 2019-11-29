@@ -15,6 +15,7 @@ class SwitchHandler: public ProfileHandler {
   private:
     typedef ProfileHandler super;
     boolean on;
+    boolean invert;
     short int actuate;
     short int listen;
     unsigned long lastDebounceCheck;
@@ -25,7 +26,7 @@ class SwitchHandler: public ProfileHandler {
     void toggle();
 
   public:
-    void setup(JsonObject& config);
+    void setup(JsonObject config);
     void init();
     void loop();
     void doHandle(char topic[], char payload[], int length);
