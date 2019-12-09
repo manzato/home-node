@@ -25,7 +25,7 @@ char* configTopic;
 unsigned long lastBroadcast = 0;
 
 WiFiClient wifiClient;
-MQTTClient client(512); //max package size
+MQTTClient client(1024); //max package size
 
 void clientIdSetup() {
   sprintf(deviceId, "yaha-%04d", DEVICE_ID);
@@ -55,9 +55,7 @@ void setup() {
     delay(500);
     Serial.print(F("."));
   }
-  Serial.println();
-
-  Serial.print(F("Connected, IP address: "));
+  Serial.print(F("! Connected with IP address: "));
   Serial.println(WiFi.localIP());
 
   ArduinoOTA.onStart([]() {
@@ -111,7 +109,7 @@ void reconnect() {
       Serial.println(F("<"));
       client.subscribe(configTopic);
 
-      delay(100);
+      delay(50);
 
       checkForConfig(true);
     } else {
