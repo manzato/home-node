@@ -4,24 +4,36 @@
 
 void SwitchHandler::setOn() {
   this->on = true;
-  Serial.print("Switching ");
-  Serial.print(this->actuate);
-  Serial.println(" on");
-  digitalWrite(this->actuate, this->invert ? LOW : HIGH);
+  Serial.print(F("Switch on"));
+  if (this->actuate != -1) {
+    Serial.print(F(" PIN "));
+    Serial.print(this->actuate);
+    digitalWrite(this->actuate, this->invert ? LOW : HIGH);
+  }
   if (strlen(this->outTopic) > 0) {
+    Serial.print(F(" ("));
+    Serial.print(this->outTopic);
+    Serial.print(F(")"));
     this->client->publish(this->outTopic, "on");
   }
+  Serial.println();
 }
 
 void SwitchHandler::setOff() {
+  Serial.print(F("Switch off"));
   this->on = false;
-  Serial.print("Switching ");
-  Serial.print(this->actuate);
-  Serial.println(" off");
-  digitalWrite(this->actuate, this->invert ? HIGH : LOW);
+  if (this->actuate != -1) {
+    Serial.print(F(" PIN "));
+    Serial.print(this->actuate);
+    digitalWrite(this->actuate, this->invert ? HIGH : LOW);
+  }
   if (strlen(this->outTopic) > 0) {
+    Serial.print(F(" ("));
+    Serial.print(this->outTopic);
+    Serial.print(F(")"));
     this->client->publish(this->outTopic, "off");
   }
+  Serial.println();
 }
 
 void SwitchHandler::toggle() {
@@ -47,6 +59,7 @@ void SwitchHandler::setup(JsonObject config) {
   this->listen = config.getMember(F("listen")).as<short>();
   this->on= config.getMember(F("on")).as<bool>();
   this->invert = config.getMember(F("invert")).as<bool>();
+  this->stateFromPin = config.getMember(F("state_from_pin")).as<bool>();
 
   Serial.print(F("Switch"));
   if (this->listen != -1) {
@@ -62,6 +75,9 @@ void SwitchHandler::setup(JsonObject config) {
 
   if (this->invert) {
     Serial.print(F(" (inverted)"));
+  }
+  if (this->stateFromPin) {
+    Serial.print(F(" (state from PIN)"));
   }
   Serial.println();
 }
@@ -89,6 +105,14 @@ void SwitchHandler::init() {
     //To prevent an initial "event" by the debounce logic
     this->lastValue = digitalRead(this->listen);
     this->lastDebounceValue = this->lastValue;
+
+    if (this->stateFromPin) {
+      if (this->lastValue == 0) {
+        this->setOff();
+      } else {
+        this->setOn();
+      }
+    }
   }
 }
 

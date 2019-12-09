@@ -16,6 +16,7 @@ class SwitchHandler: public ProfileHandler {
     typedef ProfileHandler super;
     boolean on;
     boolean invert;
+    boolean stateFromPin; //Is the state of the switch dictated by the pin?
     short int actuate;
     short int listen;
     unsigned long lastDebounceCheck;
