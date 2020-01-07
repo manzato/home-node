@@ -122,11 +122,17 @@ void reconnect() {
   }
 };
 
+
+
+void addPhotocell(bool force) {
+
+}
+
 void checkForConfig(bool force) {
   if ( ! force && handlersCount != 0 ) {
     return;
   }
-  
+
   const unsigned long now = millis();
 
   //Prevent locking if millis() overflows
@@ -162,7 +168,7 @@ void loop() {
   client.loop();
 
   checkForConfig(false);
-  
+
   // Gives the handlers cycles to process their on-going tasks
   for(int i = 0 ; i < handlersCount  ; i++) {
     handlers[i]->loop();
